@@ -1,0 +1,10 @@
+{
+  "name": "cobranza-demo",
+  "main": "src/index.js",
+  "compatibility_date": "2026-05-28",
+  "vars": {
+    "EMPRESA": "Financiera Demo"
+  }
+  // Secretos (npx wrangler secret put <NOMBRE>):
+  //   ELEVENLABS_API_KEY, DEMO_CODE, AGENT_ID, PHONE_NUMBER_ID
+}

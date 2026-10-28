@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cobranza IA · Financiera Demo</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #14171f; --muted: #667085; --line: #e4e7ec;
+    --brand: #1f4fd8; --ok: #12805c; --ok-bg: #e7f6ef; --bad: #b42318; --bad-bg: #fdecea;
+    --warn: #9a6700; --warn-bg: #fff4d6; --neutral-bg: #eef1f5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--ink); color: #fff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 19px; font-weight: 650; }
+  header p { margin: 2px 0 0; color: #b5bccb; font-size: 13px; }
+  .badge { padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .badge.ok { background: var(--ok-bg); color: var(--ok); }
+  .badge.bad { background: var(--bad-bg); color: var(--bad); }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .kpi .label { color: var(--muted); font-size: 13px; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+  section h2 { margin: 0 0 12px; font-size: 16px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td.num { font-variant-numeric: tabular-nums; }
+  input[type=tel], input[type=password] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; background: var(--brand); color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--brand); padding: 4px 0; }
+  .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--neutral-bg); color: var(--muted); white-space: nowrap; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); }
+  .chip.bad { background: var(--bad-bg); color: var(--bad); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .calls { display: grid; gap: 12px; }
+  .call { border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .call-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .call-head strong { font-size: 15px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 12px 0 8px; }
+  .facts div span { display: block; color: var(--muted); font-size: 12px; }
+  .summary { margin: 8px 0 0; font-size: 14px; }
+  .transcript { margin-top: 10px; display: grid; gap: 6px; font-size: 14px; }
+  .transcript p { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--neutral-bg); }
+  .transcript p.agent { background: #e9effd; }
+  .empty { color: var(--muted); text-align: center; padding: 20px; }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); display: none; }
+  #gate { max-width: 360px; margin: 80px auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  #gate h2 { margin-top: 0; }
+  #gate button { width: 100%; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div id="gate" hidden>
+  <h2>Cobranza IA</h2>
+  <p class="meta">Ingresa el código de acceso de la demo.</p>
+  <input id="code" type="password" autocomplete="off">
+  <button id="enter">Entrar</button>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div>
+      <h1>Cobranza IA · Financiera Demo</h1>
+      <p>Agente de voz que llama a la cartera vencida, negocia dentro de límites y registra el resultado.</p>
+    </div>
+    <span id="horario" class="badge">…</span>
+  </header>
+  <main>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Llamadas realizadas</div><div class="value" id="k-llamadas">0</div></div>
+      <div class="kpi"><div class="label">Clientes contactados</div><div class="value" id="k-contactados">0</div></div>
+      <div class="kpi"><div class="label">Promesas de pago</div><div class="value" id="k-promesas">0</div></div>
+      <div class="kpi"><div class="label">Monto prometido</div><div class="value" id="k-monto">$0</div></div>
+      <div class="kpi"><div class="label">Cobranza respetuosa</div><div class="value" id="k-respeto">—</div></div>
+    </div>
+
+    <section>
+      <h2>Cartera vencida</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cliente</th><th>Saldo</th><th>Días de atraso</th><th>Descuento máx.</th><th>Parcialidades</th><th style="width:190px">Teléfono (10 dígitos)</th><th></th><th>Último estatus</th></tr></thead>
+          <tbody id="cartera"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Llamadas recientes</h2>
+      <div id="calls" class="calls"><div class="empty">Cargando…</div></div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+let CARTERA = [];
+
+const $ = (id) => document.getElementById(id);
+const pesos = (n) => "$" + Number(n || 0).toLocaleString("es-MX", { maximumFractionDigits: 0 });
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+let code = store.get("demo-code");
+let llamadas = [];
+let permitido = true;
+let timer;
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(() => (t.style.display = "none"), 5000);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "x-demo-code": code || "", "content-type": "application/json" } });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { store.del("demo-code"); code = null; showGate(); throw new Error("Código inválido"); }
+  if (!res.ok) throw new Error(data.error || "Error " + res.status);
+  return data;
+}
+
+function showGate() { $("app").hidden = true; $("gate").hidden = false; }
+function showApp() { $("gate").hidden = true; $("app").hidden = false; }
+
+$("enter").onclick = () => { code = $("code").value.trim(); store.set("demo-code", code); start(); };
+$("code").onkeydown = (e) => { if (e.key === "Enter") $("enter").click(); };
+
+function estatusLlamada(c) {
+  if (c.status === "failed") return ["Falló", "bad"];
+  if (c.status === "initiated" || c.status === "in-progress") return ["En llamada…", "warn"];
+  if (c.status === "processing") return ["Analizando…", "warn"];
+  const r = c.resultado_llamada;
+  if (r === "no_answer") return ["No contestó", "bad"];
+  if (r === "busy") return ["Ocupado", "bad"];
+  if (r === "voicemail") return ["Buzón de voz", "bad"];
+  if (c.datos.pidio_no_llamar === true) return ["Pidió no llamar", "bad"];
+  if (c.datos.promesa_pago === true) return ["Promesa de pago", "ok"];
+  return ["Sin acuerdo", ""];
+}
+
+function renderCartera() {
+  const tbody = $("cartera");
+  tbody.innerHTML = "";
+  for (const c of CARTERA) {
+    const ultima = llamadas.find((l) => l.cliente_id === c.id);
+    const [txt, cls] = ultima ? estatusLlamada(ultima) : ["Sin llamar", ""];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong></strong></td>
+      <td class="num">${pesos(c.monto)}</td>
+      <td class="num">${c.dias_vencido}</td>
+      <td class="num">${c.descuento_max}%</td>
+      <td class="num">${c.max_parcialidades}</td>
+      <td><input type="tel" inputmode="numeric" placeholder="55 1234 5678"></td>
+      <td><button>Llamar</button></td>
+      <td><span class="chip ${cls}">${txt}</span></td>`;
+    tr.querySelector("strong").textContent = c.nombre;
+    const input = tr.querySelector("input");
+    input.value = store.get("tel-" + c.id) || "";
+    input.oninput = () => store.set("tel-" + c.id, input.value);
+    const btn = tr.querySelector("button");
+    btn.disabled = !permitido;
+    btn.title = permitido ? "" : "Fuera del horario permitido";
+    btn.onclick = () => llamar(c, input.value, btn);
+    tbody.appendChild(tr);
+  }
+}
+
+async function llamar(cliente, telefono, btn) {
+  if (String(telefono).replace(/\D/g, "").length < 10) return toast("Escribe un teléfono de 10 dígitos");
+  btn.disabled = true;
+  btn.textContent = "Marcando…";
+  try {
+    await api("/api/call", { method: "POST", body: JSON.stringify({ id: cliente.id, telefono }) });
+    toast("Llamando a " + cliente.nombre + "…");
+    setTimeout(refresh, 2500);
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    setTimeout(() => { btn.disabled = !permitido; btn.textContent = "Llamar"; }, 4000);
+  }
+}
+
+function renderKpis() {
+  const contactados = llamadas.filter((l) => l.status === "done" && (l.duracion || 0) > 10 && !["no_answer", "busy", "voicemail"].includes(l.resultado_llamada));
+  const promesas = llamadas.filter((l) => l.datos.promesa_pago === true);
+  const evaluadas = llamadas.filter((l) => l.evaluacion === "success" || l.evaluacion === "failure");
+  const ok = evaluadas.filter((l) => l.evaluacion === "success").length;
+  $("k-llamadas").textContent = llamadas.length;
+  $("k-contactados").textContent = contactados.length;
+  $("k-promesas").textContent = promesas.length;
+  $("k-monto").textContent = pesos(promesas.reduce((s, l) => s + (Number(l.datos.monto_acordado) || 0), 0));
+  $("k-respeto").textContent = evaluadas.length ? Math.round((ok / evaluadas.length) * 100) + "%" : "—";
+}
+
+const TIPO = { total: "Pago total", parcialidades: "Parcialidades", fecha_compromiso: "Fecha compromiso", sin_acuerdo: "Sin acuerdo" };
+
+function renderLlamadas() {
+  const box = $("calls");
+  if (!llamadas.length) { box.innerHTML = '<div class="empty">Aún no hay llamadas. Escribe un teléfono y presiona “Llamar”.</div>'; return; }
+  const abiertos = new Set([...box.querySelectorAll(".call[data-open]")].map((e) => e.dataset.id));
+  box.innerHTML = "";
+  for (const l of llamadas) {
+    const [txt, cls] = estatusLlamada(l);
+    const d = l.datos;
+    const el = document.createElement("div");
+    el.className = "call";
+    el.dataset.id = l.id;
+    const hora = l.inicio ? new Date(l.inicio * 1000).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "";
+    const ev = l.evaluacion === "success" ? ["Cumple", "ok"] : l.evaluacion === "failure" ? ["No cumple", "bad"] : ["Pendiente", ""];
+    el.innerHTML = `
+      <div class="call-head">
+        <div><strong class="n"></strong> <span class="meta m"></span></div>
+        <span class="chip ${cls}">${txt}</span>
+      </div>
+      <div class="facts">
+        <div><span>Tipo de acuerdo</span><b class="f-tipo"></b></div>
+        <div><span>Monto acordado</span><b class="f-monto"></b></div>
+        <div><span>Fecha de pago</span><b class="f-fecha"></b></div>
+        <div><span>Motivo de atraso</span><b class="f-motivo"></b></div>
+        <div><span>Cobranza respetuosa</span><span class="chip ${ev[1]}" title="">${ev[0]}</span></div>
+      </div>
+      <p class="summary meta"></p>
+      <button class="ghost">Ver transcripción</button>
+      <div class="transcript" hidden></div>`;
+    el.querySelector(".n").textContent = l.cliente;
+    el.querySelector(".m").textContent = "· " + hora + " · " + (Number(l.duracion) || 0) + "s · " + l.telefono;
+    el.querySelector(".f-monto").textContent = d.monto_acordado ? pesos(d.monto_acordado) : "—";
+    el.querySelector(".f-tipo").textContent = TIPO[d.tipo_acuerdo] || d.tipo_acuerdo || "—";
+    el.querySelector(".f-fecha").textContent = d.fecha_pago || "—";
+    el.querySelector(".f-motivo").textContent = d.motivo_atraso || "—";
+    el.querySelector(".facts .chip").title = l.evaluacion_motivo;
+    el.querySelector(".summary").textContent = l.resumen;
+    const tr = el.querySelector(".transcript");
+    for (const t of l.transcripcion) {
+      const p = document.createElement("p");
+      p.className = t.rol === "agent" ? "agent" : "";
+      p.textContent = (t.rol === "agent" ? "Agente: " : "Cliente: ") + t.texto;
+      tr.appendChild(p);
+    }
+    const btn = el.querySelector("button");
+    const toggle = (open) => { tr.hidden = !open; btn.textContent = open ? "Ocultar transcripción" : "Ver transcripción"; open ? el.dataset.open = "1" : delete el.dataset.open; };
+    btn.onclick = () => toggle(tr.hidden);
+    if (abiertos.has(l.id)) toggle(true);
+    box.appendChild(el);
+  }
+}
+
+async function refresh() {
+  clearTimeout(timer);
+  try {
+    const data = await api("/api/calls");
+    llamadas = data.llamadas;
+    CARTERA = data.cartera;
+    if (data.error) toast(data.error);
+    permitido = data.horario.permitido;
+    const b = $("horario");
+    b.textContent = permitido ? "Dentro del horario permitido (" + data.horario.ventana + " CDMX)" : "Fuera de horario: llamadas bloqueadas (" + data.horario.ventana + ")";
+    b.className = "badge " + (permitido ? "ok" : "bad");
+    renderKpis();
+    renderCartera();
+    renderLlamadas();
+  } catch (e) {
+    if (code) toast(e.message);
+  }
+  const activa = llamadas.some((l) => ["initiated", "in-progress", "processing"].includes(l.status));
+  if (code) timer = setTimeout(refresh, activa ? 4000 : 15000);
+}
+
+function start() {
+  if (!code) return showGate();
+  showApp();
+  renderCartera();
+  refresh();
+}
+start();
+</script>
+</body>
+</html>
